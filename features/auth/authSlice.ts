@@ -1,4 +1,4 @@
-import { getMe, loginUser,signupUser } from '@/api/auth/auth'
+import { getMe, loginUser, logoutUser, signupUser } from '@/api/auth/auth'
 import { User } from '@/interfaces/auth/auth.interface'
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 
@@ -24,10 +24,6 @@ export const authSlice = createSlice({
     initialState,
 
     reducers: {
-        logout: (state) => {
-            state.user = null
-            state.isAuthenticated = false
-        },
     },
 
     extraReducers: (builder) => {
@@ -44,6 +40,21 @@ export const authSlice = createSlice({
                 state.isAuthenticated = true
             })
             .addCase(loginUser.rejected, (state, action) => {
+                state.loading = false
+                state.error = action.payload as string
+            })
+
+            //LOGOUT
+            .addCase(logoutUser.pending, (state) => {
+                state.loading = true
+                state.error = null
+            })
+            .addCase(logoutUser.fulfilled, (state, action: PayloadAction<User>) => {
+                state.loading = false
+                state.user = null
+                state.isAuthenticated = false
+            })
+            .addCase(logoutUser.rejected, (state, action) => {
                 state.loading = false
                 state.error = action.payload as string
             })
@@ -80,5 +91,5 @@ export const authSlice = createSlice({
     },
 })
 
-export const { logout } = authSlice.actions
+export const { } = authSlice.actions
 export default authSlice.reducer

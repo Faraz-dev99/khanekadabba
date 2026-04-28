@@ -3,6 +3,7 @@ export interface SignupData {
   email: string
   password: string
   role: 'USER' | 'SELLER' | 'DELIVERY'
+  userImage?: File | null
 
   city?: string
   location?: string
@@ -19,4 +20,20 @@ export interface SignupData {
   vehicleType?: string
   vehicleNumber?: string
   licenseNumber?: string
+}
+
+export interface User {
+  id: string
+  name: string
+  email: string
+  role: 'ADMIN' | 'USER' | 'SELLER' | 'DELIVERY'
+  status: 'ACTIVE' | 'INACTIVE'
+
+  phone?: string
+  city?: string
+  location?: string
+  address?: string
+  lat?: number
+  lang?: number
+  userImage?: any
 }

@@ -2,7 +2,9 @@
 
 import { useSelector, useDispatch } from 'react-redux'
 import { useRouter } from 'next/navigation'
-import { logout } from '@/features/auth/authSlice'
+import { logoutUser } from '@/api/auth/auth';
+import { useAppDispatch } from '@/store/hooks';
+
 
 // ─── Role badge colours ───────────────────────────────────────────────────────
 const roleMeta: Record<string, { label: string; color: string; bg: string; icon: string }> = {
@@ -169,7 +171,7 @@ function GuestLanding() {
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function HomePage() {
   const { user, isAuthenticated } = useSelector((state: any) => state.auth)
-  const dispatch = useDispatch()
+  const dispatch = useAppDispatch()
   const router = useRouter()
 
   if (!isAuthenticated) return <GuestLanding />
@@ -178,8 +180,8 @@ export default function HomePage() {
   const meta = roleMeta[role] ?? roleMeta.USER
   const cards = roleCards[role] ?? roleCards.USER
 
-  const handleLogout = () => {
-    dispatch(logout())
+  const handleLogout =async () => {
+    const res: any = await dispatch(logoutUser())
     router.push('/login')
   }
 

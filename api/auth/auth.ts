@@ -11,8 +11,33 @@ export const loginUser = createAsyncThunk(
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include', 
+        credentials: 'include',
         body: JSON.stringify(data),
+      })
+
+      const result = await res.json()
+
+      if (!result.success) {
+        return rejectWithValue(result.message)
+      }
+
+      return result.user
+    } catch (err: any) {
+      return rejectWithValue(err.message)
+    }
+  }
+)
+
+export const logoutUser = createAsyncThunk(
+  'auth/logoutUser',
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await fetch(API_ROUTES.AUTH.LOGOUT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
       })
 
       const result = await res.json()
@@ -53,25 +78,29 @@ export const getMe = createAsyncThunk(
 
 
 
+
+
 export const signupUser = createAsyncThunk(
   'auth/signupUser',
   async (data: SignupData, { rejectWithValue }) => {
     try {
+      const formData = new FormData()
+      formData.append('name', data.name)
+      formData.append('email', data.email)
+      formData.append('password', data.password)
+      formData.append('role', data.role)
+      if (data.userImage) {
+        formData.append('UserImage', data.userImage)
+      }
+
       const res = await fetch(API_ROUTES.AUTH.SIGNUP, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // ⭐ important (cookie)
-        body: JSON.stringify(data),
+        credentials: 'include',
+        body: formData,
       })
 
       const result = await res.json()
-
-      if (!result.success) {
-        return rejectWithValue(result.message)
-      }
-
+      if (!result.success) return rejectWithValue(result.message)
       return result.user
     } catch (err: any) {
       return rejectWithValue(err.message)
