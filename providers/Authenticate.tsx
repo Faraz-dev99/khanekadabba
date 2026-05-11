@@ -3,13 +3,19 @@
 import { useEffect } from 'react'
 import { useDispatch } from 'react-redux'
 import { getMe } from '@/api/auth/auth'
+import { useAppDispatch, useAppSelector } from '@/store/hooks'
+import { useRouter } from 'next/navigation'
 
 export default function Authenticate() {
-  const dispatch = useDispatch()
+    const dispatch = useAppDispatch()
+    const { user } = useAppSelector((state) => state.auth)
+    const router = useRouter();
 
-  useEffect(() => {
-    dispatch(getMe() as any)
-  }, [dispatch])
+    useEffect(() => {
+        if (!user) {
+            dispatch(getMe())
+        }
+    }, [user,router])
 
-  return null
+    return null
 }
