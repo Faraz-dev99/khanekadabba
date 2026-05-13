@@ -19,10 +19,11 @@ import {
   BarChart2,
   Settings,
 } from "lucide-react";
-import { useAppSelector } from "@/store/hooks"; // adjust to your hooks path
+import { useAppDispatch, useAppSelector } from "@/store/hooks"; // adjust to your hooks path
 import { NAV_SECTIONS } from "@/app/data/sidebar/sidebarData";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { logoutUser } from "@/api/auth/auth";
 
 // ─── Role Types ───────────────────────────────────────────────────────────────
 
@@ -318,6 +319,7 @@ const SectionLabel: React.FC<{ label: string; isOpen: boolean }> = ({
 const SideMenuDesktop: React.FC = () => {
   const [isOpen, setIsOpen] = useState<boolean>(true);
   const { user, loading } = useAppSelector((state) => state.auth);
+    const dispatch = useAppDispatch()
 
   const userRole = user?.role as UserRole | undefined;
 
@@ -467,6 +469,9 @@ const SideMenuDesktop: React.FC = () => {
                 </p>
               </div>
               <LogOut
+              onClick={()=>{
+                dispatch(logoutUser())
+              }}
                 size={14}
                 className="flex-shrink-0 text-[var(--color-nav-muted)] opacity-0 group-hover:opacity-100 transition-opacity duration-150"
               />
