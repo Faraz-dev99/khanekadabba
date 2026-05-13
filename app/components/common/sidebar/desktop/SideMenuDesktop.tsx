@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   ChevronDown,
   Home,
@@ -14,7 +14,19 @@ import {
   ListOrdered,
   Layers,
   LogOut,
+  ShieldCheck,
+  Users,
+  BarChart2,
+  Settings,
 } from "lucide-react";
+import { useAppSelector } from "@/store/hooks"; // adjust to your hooks path
+import { NAV_SECTIONS } from "@/app/data/sidebar/sidebarData";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+// ─── Role Types ───────────────────────────────────────────────────────────────
+
+export type UserRole = "ADMIN" | "MANAGER" | "USER";
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -22,34 +34,86 @@ export interface NavSubItem {
   title: string;
   url: string;
   icon?: React.ElementType;
+  /**
+   * Leave undefined  → visible to ALL roles
+   * Define roles[]   → only those roles see this item
+   */
+  roles?: UserRole[];
 }
 
 export interface NavItem {
+  /**
+   * url can be a static string OR a function that receives the current role
+   * and returns the correct URL — perfect for role-based redirects.
+   *
+   * Example:
+   *   url: (role) => role === "ADMIN" ? "/admin-dashboard" : "/dashboard"
+   */
+  url: string | ((role: UserRole | undefined) => string);
   title: string;
-  url: string;
   icon: React.ElementType;
   items?: NavSubItem[];
   badge?: string;
+  roles?: UserRole[];
 }
 
 export interface NavSection {
   label: string;
   items: NavItem[];
+  /** Hide the entire section from certain roles */
+  roles?: UserRole[];
 }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** True when item has no role restriction, or user's role is in the list */
+function canSee(
+  itemRoles: UserRole[] | undefined,
+  userRole: UserRole | undefined
+): boolean {
+  if (!itemRoles || itemRoles.length === 0) return true;
+  if (!userRole) return false;
+  return itemRoles.includes(userRole);
+}
+
+/** Resolve static string OR role-based function to a final URL */
+function resolveUrl(
+  url: string | ((role: UserRole | undefined) => string),
+  role: UserRole | undefined
+): string {
+  return typeof url === "function" ? url(role) : url;
+}
+
+// ─── Nav Definition ───────────────────────────────────────────────────────────
+//
+//  Quick reference:
+//  ┌─────────────────────────────────────────────────────────────┐
+//  │  Visible to ALL         →  omit `roles` entirely            │
+//  │  ADMIN only             →  roles: ["ADMIN"]                 │
+//  │  ADMIN + MANAGER        →  roles: ["ADMIN", "MANAGER"]      │
+//  │  Role-based URL         →  url: (r) => r==="ADMIN"?"/a":"/b"│
+//  └─────────────────────────────────────────────────────────────┘
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
+
 
 // ─── Sub Item ─────────────────────────────────────────────────────────────────
 
 interface SubItemProps {
   item: NavSubItem;
-  currentPath?: string;
+  currentPath: string;
+  userRole: UserRole | undefined;
 }
 
-const SubItem: React.FC<SubItemProps> = ({ item, currentPath }) => {
+const SubItem: React.FC<SubItemProps> = ({ item, currentPath, userRole }) => {
+  if (!canSee(item.roles, userRole)) return null;
+
   const SubIcon = item.icon;
   const isActive = currentPath === item.url;
 
   return (
-    <a
+    <Link
       href={item.url}
       className={`
         flex items-center gap-2.5 pl-9 pr-3 py-2 rounded-lg text-sm
@@ -72,7 +136,7 @@ const SubItem: React.FC<SubItemProps> = ({ item, currentPath }) => {
         />
       )}
       {item.title}
-    </a>
+    </Link>
   );
 };
 
@@ -81,18 +145,28 @@ const SubItem: React.FC<SubItemProps> = ({ item, currentPath }) => {
 interface MenuItemProps {
   item: NavItem;
   isOpen: boolean;
-  currentPath?: string;
+  currentPath: string;
+  userRole: UserRole | undefined;
 }
 
-const MenuItem: React.FC<MenuItemProps> = ({ item, isOpen, currentPath }) => {
+const MenuItem: React.FC<MenuItemProps> = ({
+  item,
+  isOpen,
+  currentPath,
+  userRole,
+}) => {
+  if (!canSee(item.roles, userRole)) return null;
+
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const Icon = item.icon;
+  const resolvedUrl = resolveUrl(item.url, userRole);
+  const hasChildren = !!item.items?.length;
 
   const isActive =
-    currentPath === item.url ||
-    item.items?.some((s) => s.url === currentPath);
-
-  const hasChildren = !!item.items?.length;
+    currentPath === resolvedUrl ||
+    item.items
+      ?.filter((s) => canSee(s.roles, userRole))
+      .some((s) => s.url === currentPath);
 
   const handleClick = () => {
     if (hasChildren && isOpen) setIsExpanded((p) => !p);
@@ -101,101 +175,121 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, isOpen, currentPath }) => {
   const baseRow = `
     relative flex items-center rounded-lg
     transition-colors duration-150 cursor-pointer select-none
-    ${isActive
-      ? "bg-[var(--color-primary-soft)] text-[var(--color-primary)]"
-      : "text-[var(--color-nav-text)] hover:bg-[var(--color-nav-hover)] hover:text-[var(--color-nav-text)]"
+    ${
+      isActive
+        ? "bg-[var(--color-primary-soft)] text-[var(--color-primary)]"
+        : "text-[var(--color-nav-text)] hover:bg-[var(--color-nav-hover)]"
     }
   `;
 
-  // ── Collapsed: icon only, perfectly centered ─────────────────────────────
+  // ── Inner content shared by both button and Link ─────────────────────────
+  const innerContent = (
+    <>
+      {isActive && (
+        <span className="absolute left-0 inset-y-2 w-[3px] bg-[var(--color-primary)] rounded-r-full" />
+      )}
+      <span
+        className={`
+          flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-md
+          transition-colors duration-150
+          ${
+            isActive
+              ? "bg-[var(--color-primary)] text-white"
+              : "bg-[var(--color-icon-bg)] text-[var(--color-nav-icon)]"
+          }
+        `}
+      >
+        <Icon size={15} />
+      </span>
+
+      <span className="flex-1 text-sm font-medium leading-none truncate">
+        {item.title}
+      </span>
+
+      {item.badge && (
+        <span className="flex-shrink-0 px-1.5 py-0.5 rounded-full text-[10px] font-semibold leading-none bg-[var(--color-primary)] text-white">
+          {item.badge}
+        </span>
+      )}
+
+      {hasChildren && (
+        <ChevronDown
+          size={14}
+          className={`
+            flex-shrink-0 text-[var(--color-nav-muted)]
+            transition-transform duration-200
+            ${isExpanded ? "rotate-0" : "-rotate-90"}
+          `}
+        />
+      )}
+    </>
+  );
+
+  // ── Collapsed: icon only ──────────────────────────────────────────────────
   if (!isOpen) {
     return (
       <div className="mb-0.5">
-        <a
-          href={hasChildren ? undefined : item.url}
-          onClick={hasChildren ? handleClick : undefined}
-          title={item.title}
-          className={`${baseRow} w-full h-10 flex justify-center items-center`}
-        >
-          {/* Active accent line */}
-          {isActive && (
-            <span className="absolute left-0 inset-y-2 w-[3px] bg-[var(--color-primary)] rounded-r-full" />
-          )}
-          <Icon
-            size={18}
-            className={`
-              flex-shrink-0
-              ${isActive ? "text-[var(--color-primary)]" : "text-[var(--color-nav-icon)]"}
-            `}
-          />
-        </a>
+        {hasChildren ? (
+          <button
+            onClick={handleClick}
+            title={item.title}
+            className={`${baseRow} w-full h-10 flex justify-center items-center`}
+          >
+            {isActive && (
+              <span className="absolute left-0 inset-y-2 w-[3px] bg-[var(--color-primary)] rounded-r-full" />
+            )}
+            <Icon
+              size={18}
+              className={`flex-shrink-0 ${isActive ? "text-[var(--color-primary)]" : "text-[var(--color-nav-icon)]"}`}
+            />
+          </button>
+        ) : (
+          <Link
+            href={resolvedUrl}
+            title={item.title}
+            className={`${baseRow} w-full h-10 flex justify-center items-center`}
+          >
+            {isActive && (
+              <span className="absolute left-0 inset-y-2 w-[3px] bg-[var(--color-primary)] rounded-r-full" />
+            )}
+            <Icon
+              size={18}
+              className={`flex-shrink-0 ${isActive ? "text-[var(--color-primary)]" : "text-[var(--color-nav-icon)]"}`}
+            />
+          </Link>
+        )}
       </div>
     );
   }
 
-  // ── Expanded: icon + label ───────────────────────────────────────────────
+  // ── Expanded: icon + label ────────────────────────────────────────────────
   return (
     <div className="mb-0.5">
-      <a
-        href={hasChildren ? undefined : item.url}
-        onClick={hasChildren ? handleClick : undefined}
-        className={`${baseRow} w-full h-10 px-3 gap-3`}
-      >
-        {/* Active accent line */}
-        {isActive && (
-          <span className="absolute left-0 inset-y-2 w-[3px] bg-[var(--color-primary)] rounded-r-full" />
-        )}
-
-        {/* Icon */}
-        <span
-          className={`
-            flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-md
-            transition-colors duration-150
-            ${isActive
-              ? "bg-[var(--color-primary)] text-white"
-              : "bg-[var(--color-icon-bg)] text-[var(--color-nav-icon)] group-hover:bg-[var(--color-icon-bg-hover)]"
-            }
-          `}
+      {hasChildren ? (
+        <button
+          onClick={handleClick}
+          className={`${baseRow} w-full h-10 px-3 gap-3`}
         >
-          <Icon size={15} />
-        </span>
+          {innerContent}
+        </button>
+      ) : (
+        <Link
+          href={resolvedUrl}
+          className={`${baseRow} w-full h-10 px-3 gap-3`}
+        >
+          {innerContent}
+        </Link>
+      )}
 
-        {/* Label */}
-        <span className="flex-1 text-sm font-medium leading-none truncate">
-          {item.title}
-        </span>
-
-        {/* Badge */}
-        {item.badge && (
-          <span
-            className="
-              flex-shrink-0 px-1.5 py-0.5 rounded-full
-              text-[10px] font-semibold leading-none
-              bg-[var(--color-primary)] text-white
-            "
-          >
-            {item.badge}
-          </span>
-        )}
-
-        {/* Chevron for sub-menus */}
-        {hasChildren && (
-          <ChevronDown
-            size={14}
-            className={`
-              flex-shrink-0 text-[var(--color-nav-muted)]
-              transition-transform duration-200
-              ${isExpanded ? "rotate-0" : "-rotate-90"}
-            `}
-          />
-        )}
-      </a>
-
-      {/* Sub-items */}
       {hasChildren && isExpanded && (
         <div className="mt-0.5 mb-1">
           {item.items!.map((sub, i) => (
-            <SubItem key={i} item={sub} currentPath={currentPath} />
+            <SubItem
+              key={i}
+              item={sub}
+              currentPath={currentPath}
+              userRole={userRole}
+            />
           ))}
         </div>
       )}
@@ -203,56 +297,14 @@ const MenuItem: React.FC<MenuItemProps> = ({ item, isOpen, currentPath }) => {
   );
 };
 
-// ─── Nav Data ─────────────────────────────────────────────────────────────────
-
-const navSections: NavSection[] = [
-  {
-    label: "Main",
-    items: [
-      {
-        title: "Dashboard",
-        url: "/dashboard",
-        icon: LayoutDashboard,
-      },
-      {
-        title: "Overview",
-        url: "/overview",
-        icon: Home,
-      },
-    ],
-  },
-  {
-    label: "Store",
-    items: [
-      {
-        title: "E-commerce",
-        url: "#",
-        icon: ShoppingCart,
-        items: [
-          { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-          { title: "Category", url: "/category", icon: Layers },
-          { title: "Sub Category", url: "/sub-category", icon: Tag },
-          { title: "Products", url: "/product", icon: Package },
-          { title: "Orders", url: "/orders", icon: ListOrdered },
-        ],
-      },
-    ],
-  },
-];
-
 // ─── Section Label ────────────────────────────────────────────────────────────
 
-interface SectionLabelProps {
-  label: string;
-  isOpen: boolean;
-}
-
-const SectionLabel: React.FC<SectionLabelProps> = ({ label, isOpen }) => {
+const SectionLabel: React.FC<{ label: string; isOpen: boolean }> = ({
+  label,
+  isOpen,
+}) => {
   if (!isOpen) {
-    // Render a thin divider line in place of label when collapsed
-    return (
-      <div className="mx-3 my-2 h-px bg-[var(--color-border)]" />
-    );
+    return <div className="mx-3 my-2 h-px bg-[var(--color-border)]" />;
   }
   return (
     <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[var(--color-nav-muted)] select-none">
@@ -265,9 +317,42 @@ const SectionLabel: React.FC<SectionLabelProps> = ({ label, isOpen }) => {
 
 const SideMenuDesktop: React.FC = () => {
   const [isOpen, setIsOpen] = useState<boolean>(true);
+  const { user, loading } = useAppSelector((state) => state.auth);
 
-  // In real usage, get from usePathname()
-  const currentPath = "/dashboard";
+  const userRole = user?.role as UserRole | undefined;
+
+  // Filter sections once per role change — no re-filtering on every render
+  const visibleSections = useMemo(
+    () => NAV_SECTIONS.filter((s) => canSee(s.roles, userRole)),
+    [userRole]
+  );
+
+  // Derive initials for avatar
+  const initials = user?.name
+    ? user.name
+        .split(" ")
+        .map((n: string) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "?";
+
+  // While auth is resolving, render a skeleton shell so layout doesn't jump
+  if (loading) {
+    return (
+      <div
+        className={`
+          flex-shrink-0 h-screen
+          bg-[var(--color-sidebar-bg)] border-r border-[var(--color-border)]
+          transition-[width] duration-300
+          ${isOpen ? "w-[260px]" : "w-[64px]"}
+        `}
+      />
+    );
+  }
+
+  // Real pathname should come from usePathname() — using window.location as fallback
+ const currentPath = usePathname();
 
   return (
     <div className="relative flex-shrink-0 h-screen">
@@ -281,8 +366,7 @@ const SideMenuDesktop: React.FC = () => {
           ${isOpen ? "w-[260px]" : "w-[64px]"}
         `}
       >
-
-        {/* ── Header ─────────────────────────────────────────────────────── */}
+        {/* ── Header ───────────────────────────────────────────────────── */}
         <div
           className={`
             flex-shrink-0 flex items-center h-[60px]
@@ -290,39 +374,29 @@ const SideMenuDesktop: React.FC = () => {
             ${isOpen ? "px-4 justify-between" : "justify-center"}
           `}
         >
-          {/* Logo */}
+          {/* Logo + name (hidden when collapsed) */}
           <div className={`flex items-center gap-2.5 ${!isOpen && "hidden"}`}>
-            <span
-              className="
-                w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center
-                bg-[var(--color-primary)]
-              "
-            >
+            <span className="w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center bg-[var(--color-primary)]">
               <Zap size={14} className="text-white" fill="white" />
             </span>
             <div className="leading-tight">
               <p className="text-[13px] font-bold text-[var(--color-heading)] tracking-tight">
                 MyApp
               </p>
-              <p className="text-[10px] text-[var(--color-nav-muted)] leading-none">
-                Admin v2.0
+              <p className="text-[10px] text-[var(--color-nav-muted)] leading-none capitalize">
+                {userRole?.toLowerCase() ?? "guest"}
               </p>
             </div>
           </div>
 
-          {/* When collapsed, show just the logo icon */}
+          {/* Logo icon only when collapsed */}
           {!isOpen && (
-            <span
-              className="
-                w-8 h-8 rounded-lg flex items-center justify-center
-                bg-[var(--color-primary)]
-              "
-            >
+            <span className="w-8 h-8 rounded-lg flex items-center justify-center bg-[var(--color-primary)]">
               <Zap size={15} className="text-white" fill="white" />
             </span>
           )}
 
-          {/* Toggle button — only visible when open */}
+          {/* Collapse button */}
           {isOpen && (
             <button
               onClick={() => setIsOpen(false)}
@@ -340,7 +414,7 @@ const SideMenuDesktop: React.FC = () => {
           )}
         </div>
 
-        {/* ── Open toggle when collapsed ──────────────────────────────────── */}
+        {/* Expand button (shown below logo when collapsed) */}
         {!isOpen && (
           <div className="flex-shrink-0 flex justify-center py-2 border-b border-[var(--color-border)]">
             <button
@@ -359,9 +433,9 @@ const SideMenuDesktop: React.FC = () => {
           </div>
         )}
 
-        {/* ── Navigation ─────────────────────────────────────────────────── */}
+        {/* ── Navigation ───────────────────────────────────────────────── */}
         <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2 px-2">
-          {navSections.map((section, si) => (
+          {visibleSections.map((section, si) => (
             <div key={si}>
               <SectionLabel label={section.label} isOpen={isOpen} />
               {section.items.map((item, ii) => (
@@ -370,63 +444,46 @@ const SideMenuDesktop: React.FC = () => {
                   item={item}
                   isOpen={isOpen}
                   currentPath={currentPath}
+                  userRole={userRole}
                 />
               ))}
             </div>
           ))}
         </nav>
 
-        {/* ── Footer / User ───────────────────────────────────────────────── */}
+        {/* ── Footer / User ─────────────────────────────────────────────── */}
         <div className="flex-shrink-0 border-t border-[var(--color-border)] p-2">
           {isOpen ? (
-            /* Expanded user row */
             <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-[var(--color-nav-hover)] transition-colors duration-150 cursor-pointer group">
-              {/* Avatar */}
-              <span
-                className="
-                  flex-shrink-0 w-8 h-8 rounded-lg
-                  flex items-center justify-center
-                  bg-[var(--color-primary-soft)]
-                  text-[var(--color-primary)]
-                  text-xs font-bold
-                "
-              >
-                AU
+              <span className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center bg-[var(--color-primary-soft)] text-[var(--color-primary)] text-xs font-bold">
+                {initials}
               </span>
-              {/* Info */}
               <div className="flex-1 min-w-0 leading-tight">
                 <p className="text-xs font-semibold text-[var(--color-heading)] truncate">
-                  Admin User
+                  {user?.name ?? "Guest"}
                 </p>
                 <p className="text-[11px] text-[var(--color-nav-muted)] truncate">
-                  admin@myapp.com
+                  {user?.email ?? ""}
                 </p>
               </div>
-              {/* Logout */}
               <LogOut
                 size={14}
-                className="
-                  flex-shrink-0 text-[var(--color-nav-muted)]
-                  opacity-0 group-hover:opacity-100
-                  transition-opacity duration-150
-                "
+                className="flex-shrink-0 text-[var(--color-nav-muted)] opacity-0 group-hover:opacity-100 transition-opacity duration-150"
               />
             </div>
           ) : (
-            /* Collapsed: just avatar, centered */
             <div className="flex justify-center py-1">
               <span
-                title="Admin User"
+                title={user?.name ?? "Guest"}
                 className="
                   w-9 h-9 rounded-lg flex items-center justify-center
-                  bg-[var(--color-primary-soft)]
-                  text-[var(--color-primary)]
+                  bg-[var(--color-primary-soft)] text-[var(--color-primary)]
                   text-xs font-bold cursor-pointer
                   hover:bg-[var(--color-primary)] hover:text-white
                   transition-colors duration-150
                 "
               >
-                AU
+                {initials}
               </span>
             </div>
           )}

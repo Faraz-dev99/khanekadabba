@@ -4,27 +4,24 @@ import { useRouter } from "next/navigation";
 import { useAppSelector } from "@/store/hooks";
 
 export default function PublicRoute({ children }: { children: React.ReactNode }) {
- const { user,loading } = useAppSelector((state) => state.auth)
+  const { user, loading } = useAppSelector((state) => state.auth);
   const router = useRouter();
 
   useEffect(() => {
-    if (user && user?.role==="ADMIN") {
-      router.replace("/admin-dashboard"); // go to admin login, NOT "/"
-    }
-    else if(user){
+    if (!loading && user) {
+      // If they are logged in, get them off the public pages!
+      if (user.role === "ADMIN") {
+        router.replace("/admin-dashboard");
+      } else {
         router.replace("/dashboard");
+      }
     }
   }, [user, loading, router]);
 
-  if (loading) {
-    return (
-      <div className="grid place-items-center min-h-screen">
-        Loading...
-      </div>
-    );
-  }
+  if (loading) return <div className="grid place-items-center min-h-screen">Loading...</div>;
 
-  if (!user) return null; // prevent flash
+  // Don't show the login form if they are logged in (prevents flashing)
+  if (user) return null; 
 
   return <>{children}</>;
 }
