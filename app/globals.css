@@ -3,6 +3,41 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* ── Brand / Primary ── */
+  --primary:        #3a50dc;   /* main accent */
+  --primary-dark:   #2a3db0;   /* hover / pressed state */
+  --primary-soft:   #eef0fd;   /* icon bg on hover */
+  --primary-shadow: #3a50dc33; /* box-shadow tint (20% opacity) */
+
+  /* ── Page & Layout Backgrounds ── */
+  --page-bg:     #f4f6fb;   /* outer page bg */
+  --sidebar-bg:  #ffffff;   /* sidebar surface */
+  --header-bg:   #ffffff;   /* top header bar */
+
+  /* ── Borders ── */
+  --border-main: #e8eaf0;   /* main dividers */
+  --border-soft: #dde1ed;   /* sub-menu left border */
+
+  /* ── Typography ── */
+  --heading:    #1a1f36;   /* bold labels, brand name */
+  --nav-text:   #374151;   /* nav item text */
+  --nav-muted:  #6b7280;   /* sub-items, secondary text */
+  --nav-icon:   #6b7280;   /* default icon colour */
+
+  /* ── Interactive States ── */
+  --nav-hover:  #f0f2fc;   /* hover / active row bg */
+
+  /* ── Shadows ── */
+  --shadow-main:#1a1f3614;  /* header shadow */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+    /* You can override your other variables here for dark mode later */
+  }
 }
 
 @theme inline {
@@ -10,17 +45,32 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* 👇 MAP YOUR CUSTOM COLORS HERE SO TAILWIND CAN SEE THEM 👇 */
+  --color-primary: var(--primary);
+  --color-primary-dark: var(--primary-dark);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-shadow: var(--primary-shadow);
+  
+  --color-page-bg: var(--page-bg);
+  --color-sidebar-bg: var(--sidebar-bg);
+  --color-header-bg: var(--header-bg);
+  
+  --color-border: var(--border-main);
+  --color-border-soft: var(--border-soft);
+  
+  --color-heading: var(--heading);
+  --color-nav-text: var(--nav-text);
+  --color-nav-muted: var(--nav-muted);
+  --color-nav-icon: var(--nav-icon);
+  --color-nav-hover: var(--nav-hover);
+  
+  --color-shadow: var(--shadow-main);
 }
 
 body {
-/*   background: var(--background);
-  color: var(--foreground); */
-  font-family: Arial, Helvetica, sans-serif;
+  /* You can uncomment these now! Tailwind will use them correctly. */
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }

@@ -1,5 +1,5 @@
 'use client'
-
+import "./globals.css"
 import { useSelector } from 'react-redux'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
@@ -13,7 +13,7 @@ export default function Page() {
     if (loading) return
 
     if (user) {
-      router.replace('/dashboard') // logged in → go dashboard
+      router.replace('/admin-dashboard') // logged in → go dashboard
     }
   }, [user, loading, router])
 
